@@ -1,0 +1,6 @@
+{
+  "files.associations": { "*.yml": "ansible" },
+  "ansible.ansible.path": "ansible",
+  "ansible.executionEnvironment.enabled": false,
+  "ansible.python.interpreterPath": "/usr/bin/python"
+}

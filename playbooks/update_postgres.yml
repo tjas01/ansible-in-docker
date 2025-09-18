@@ -1,0 +1,57 @@
+---
+- name: Update Postgres (backup, pull image, recreate)
+  hosts: local
+  connection: local
+  gather_facts: false
+
+  vars:
+    ai_stack_dir: "/ai-stack"
+    postgres_service: "db"           # service name in your compose.yml
+    postgres_container: "ai_db"      # container_name in your compose.yml
+    backup_dir: "/ai-stack/backups"
+    timestamp: "{{ lookup('pipe','date +%Y%m%d%H%M%S') }}"
+
+  tasks:
+    - name: Ensure backup directory exists
+      ansible.builtin.file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Read env from running Postgres container
+      ansible.builtin.command:
+        cmd: docker exec {{ postgres_container }} env
+      register: pg_envs
+
+    - name: Extract POSTGRES_* values
+      ansible.builtin.set_fact:
+        pg_user: "{{ (pg_envs.stdout_lines | select('search','^POSTGRES_USER=') | list | first).split('=',1)[1] | default('', true) }}"
+        pg_db:   "{{ (pg_envs.stdout_lines | select('search','^POSTGRES_DB=')   | list | first).split('=',1)[1] | default('', true) }}"
+        pg_pass: "{{ (pg_envs.stdout_lines | select('search','^POSTGRES_PASSWORD=') | list | first).split('=',1)[1] | default('', true) }}"
+
+    - name: Fail if required envs are missing
+      ansible.builtin.fail:
+        msg: "Missing one of POSTGRES_USER/POSTGRES_DB/POSTGRES_PASSWORD in {{ postgres_container }} environment."
+      when: pg_user == '' or pg_db == '' or pg_pass == ''
+
+    - name: Dump Postgres database to backup file
+      ansible.builtin.shell: >
+        docker exec -e PGPASSWORD='{{ pg_pass }}' {{ postgres_container }}
+        sh -c "pg_dump -U '{{ pg_user }}' '{{ pg_db }}'"
+        > {{ backup_dir }}/{{ pg_db }}_{{ timestamp }}.sql
+
+    - name: Pull latest Postgres image
+      ansible.builtin.command:
+        cmd: docker compose -f {{ ai_stack_dir }}/docker-compose.yml pull {{ postgres_service }}
+      args:
+        chdir: "{{ ai_stack_dir }}"
+
+    - name: Recreate Postgres container
+      ansible.builtin.command:
+        cmd: docker compose -f {{ ai_stack_dir }}/docker-compose.yml up -d {{ postgres_service }}
+      args:
+        chdir: "{{ ai_stack_dir }}"
+
+    - name: Prune unused images (aggressive)
+      ansible.builtin.command:
+        cmd: docker image prune -a -f

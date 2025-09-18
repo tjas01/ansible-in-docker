@@ -1,0 +1,20 @@
+---
+- name: Update Ansible control container image (pull only)
+  hosts: local
+  connection: local
+  gather_facts: false
+
+  vars:
+    compose_file: "/workspace/compose.yaml"
+    service_name: "ansible"
+
+  tasks:
+    - name: Pull latest image for the Ansible service
+      ansible.builtin.command:
+        cmd: docker compose -f {{ compose_file }} pull {{ service_name }}
+      args:
+        chdir: "/workspace"
+
+    - name: Prune unused images (aggressive)
+      ansible.builtin.command:
+        cmd: docker image prune -a -f

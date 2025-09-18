@@ -1,0 +1,34 @@
+---
+- name: Update Ollama (service and models)
+  hosts: local
+  connection: local
+  gather_facts: false
+
+  vars:
+    ai_stack_dir: "/ai-stack"
+    ollama_service: "ollama"
+    ollama_container: "ai_ollama"       # container name from your compose.yml
+    ollama_models:
+      - "llama3.1:8b"
+
+  tasks:
+    - name: Pull latest Ollama image
+      ansible.builtin.command:
+        cmd: docker compose -f {{ ai_stack_dir }}/docker-compose.yml pull {{ ollama_service }}
+      args:
+        chdir: "{{ ai_stack_dir }}"
+
+    - name: Recreate Ollama container
+      ansible.builtin.command:
+        cmd: docker compose -f {{ ai_stack_dir }}/docker-compose.yml up -d {{ ollama_service }}
+      args:
+        chdir: "{{ ai_stack_dir }}"
+
+    - name: Pull required Ollama models
+      ansible.builtin.command:
+        cmd: docker exec {{ ollama_container }} ollama pull {{ item }}
+      loop: "{{ ollama_models }}"
+
+    - name: Prune unused images (aggressive)
+      ansible.builtin.command:
+        cmd: docker image prune -a -f

@@ -1,0 +1,16 @@
+﻿services:
+  ansible:
+    image: cytopia/ansible:latest
+    container_name: ansible-toolbox
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - /c/Users/vteja/.ssh:/root/.ssh:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - type: bind
+        source: Z:\GitHub\ai-automation-stack
+        target: /ai-stack
+    environment:
+      ANSIBLE_INVENTORY: /workspace/inventories/dev/hosts.ini
+    tty: true
+    stdin_open: true

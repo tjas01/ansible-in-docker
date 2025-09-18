@@ -1,0 +1,7 @@
+---
+- import_playbook: update_n8n.yml
+- import_playbook: update_ollama.yml
+- import_playbook: update_postgres.yml
+- import_playbook: update_qdrant.yml
+# optional: pull-only for the toolbox image; rebuild the devcontainer from VS Code after
+- import_playbook: update_ansible_control.yml

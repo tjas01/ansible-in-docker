@@ -1,0 +1,26 @@
+---
+- name: Update n8n (pull image and recreate)
+  hosts: local
+  connection: local
+  gather_facts: false
+
+  vars:
+    ai_stack_dir: "/ai-stack"
+    n8n_service: "n8n"
+
+  tasks:
+    - name: Pull latest n8n image
+      ansible.builtin.command:
+        cmd: docker compose -f {{ ai_stack_dir }}/docker-compose.yml pull {{ n8n_service }}
+      args:
+        chdir: "{{ ai_stack_dir }}"
+
+    - name: Recreate n8n container
+      ansible.builtin.command:
+        cmd: docker compose -f {{ ai_stack_dir }}/docker-compose.yml up -d {{ n8n_service }}
+      args:
+        chdir: "{{ ai_stack_dir }}"
+
+    - name: Prune dangling images
+      ansible.builtin.command:
+        cmd: docker image prune -f

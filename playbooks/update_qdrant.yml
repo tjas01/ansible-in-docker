@@ -1,0 +1,26 @@
+---
+- name: Update Qdrant (pull image and recreate)
+  hosts: local
+  connection: local
+  gather_facts: false
+
+  vars:
+    ai_stack_dir: "/ai-stack"
+    qdrant_service: "qdrant"   # service name in your docker-compose.yml
+
+  tasks:
+    - name: Pull latest Qdrant image
+      ansible.builtin.command:
+        cmd: docker compose -f {{ ai_stack_dir }}/docker-compose.yml pull {{ qdrant_service }}
+      args:
+        chdir: "{{ ai_stack_dir }}"
+
+    - name: Recreate Qdrant container
+      ansible.builtin.command:
+        cmd: docker compose -f {{ ai_stack_dir }}/docker-compose.yml up -d {{ qdrant_service }}
+      args:
+        chdir: "{{ ai_stack_dir }}"
+
+    - name: Prune unused images (aggressive)
+      ansible.builtin.command:
+        cmd: docker image prune -a -f
