@@ -1,112 +1,134 @@
-# 🛠️ Ansible in Docker — Automated AI Stack Orchestration
+# Ansible in Docker — Automated AI Stack Orchestration
 
-## 🎯 Why this project matters (Recruiter Focus)
-This repository demonstrates **infrastructure automation** in a realistic home‑lab environment:
-- **Infrastructure as Code (IaC):** consistent deployments with versioned Ansible playbooks.  
-- **Container Orchestration:** automates Dockerized services (Ollama, n8n, Postgres, Qdrant, etc.).  
-- **Operational Reliability:** one‑click Windows automation script with logging & single‑instance lock.  
-- **Scalable Design:** same playbooks work on a local PC, NAS, or cloud VPS.  
-- **Security Awareness:** least‑privilege users, secrets hygiene, scheduled updates.
-
-> Outcome: shows the ability to **design, automate, and operate** a small production‑like stack using Ansible + Docker, with CI-ready structure.
+This project shows how I use **Ansible** inside a Docker container to manage and update my AI stack (Ollama, n8n, Postgres, Qdrant, and related services).  
+It provides a clean, repeatable setup with simple playbooks and a Windows script to run everything with one click.
 
 ---
 
-## 📌 What’s in this repo (current state)
-- **Ansible controller in Docker** (run Ansible from a container; keep the host clean).
-- **Playbooks** for updating/restarting containers (e.g., `playbooks/update_all.yml`).
-- **Inventory** for your lab machines: `inventories/dev/hosts.ini`.
-- **Windows one‑click updater** (**ready now**): `AIstack.ps1` (starts Docker Desktop if needed, brings up the toolbox, runs the Ansible playbook, writes logs).
-
-> **Not enabled yet:** GitHub Actions. A sample workflow is provided below, but it is **not active** until you add it to `.github/workflows/`.
+## Why this project matters
+- **Automation:** Common tasks like updates and restarts are handled by playbooks.  
+- **Consistency:** Ansible runs in a container, so the environment is the same every time.  
+- **Ease of use:** A PowerShell script starts Docker, brings up the controller, runs the playbook, and saves logs.  
+- **Extensibility:** Separate playbooks for each service make it easy to add more as the stack grows.  
+- **CI/CD Ready:** Can be connected to GitHub Actions with a self‑hosted runner.  
 
 ---
 
-## 🧭 Repo structure (minimal)
+## Skills demonstrated
+- Writing and organizing **Ansible playbooks**.  
+- Using **inventories** to target local and remote systems.  
+- Running Ansible from a **containerized controller**.  
+- Automating with a **PowerShell wrapper script** on Windows.  
+- Designing a repo structure that is **ready for CI/CD**.  
+
+---
+
+## Architecture
 ```
-ansible-in-docker/
+Windows Host
+└─ Docker Desktop
+   └─ compose.yaml
+      └─ ansible-toolbox  (Ansible controller)
+          ├─ playbooks/
+          ├─ inventories/dev/hosts.ini
+          └─ collections/requirements.yml
+
+Windows automation
+└─ AIstack.ps1  (start Docker → compose up → run playbook → log)
+```
+
+---
+
+## Repository structure
+```
+ANSIBLE-IN-DOCKER/
+├─ .devcontainer/               # VS Code dev container setup
+├─ .vscode/                     # Editor settings and tasks
+├─ .vault/                      # placeholder only; do not commit secrets
+├─ collections/requirements.yml # Ansible Galaxy dependencies
+├─ inventories/dev/hosts.ini    # inventory for local dev
 ├─ playbooks/
-│  └─ update_all.yml
-├─ inventories/
-│  └─ dev/
-│     └─ hosts.ini
-├─ roles/                  # (add roles here as your stack grows)
-├─ compose.yaml            # (defines the 'ansible-toolbox' service)
-├─ AIstack.ps1             # one-click Windows automation
+│  ├─ ping.yml
+│  ├─ update_all.yml
+│  ├─ update_ansible_container.yml
+│  ├─ update_n8n.yml
+│  ├─ update_ollama.yml
+│  ├─ update_postgres.yml
+│  └─ update_qdrant.yml
+├─ roles/                       # add roles here as needed
+├─ AIstack.ps1                  # one‑click Windows runner
+├─ ansible.cfg                  # Ansible defaults
+├─ compose.yaml                 
 └─ README.md
 ```
 
 ---
 
-## 🚀 Quick start
+## Getting started
 
-### 1) Bring up the controller
-```powershell
-# From the repo root
+### 1. Start the controller
+```bash
 docker compose up -d
 ```
 
-### 2) Run the playbook from the container
-```powershell
-# Replace inventory path if needed
-docker exec -it $(docker compose ps -q ansible-toolbox) sh -lc "ansible-playbook playbooks/update_all.yml -i inventories/dev/hosts.ini"
+### 2. Install collections (first run)
+```bash
+docker exec -it $(docker compose ps -q ansible-toolbox) \
+  sh -lc "ansible-galaxy install -r collections/requirements.yml"
 ```
 
-If you defined inventory in `ansible.cfg`, you can omit the `-i` flag.
+### 3. Test connectivity
+```bash
+docker exec -it $(docker compose ps -q ansible-toolbox) \
+  sh -lc "ansible -i inventories/dev/hosts.ini all -m ping"
+```
+
+### 4. Run all updates
+```bash
+docker exec -it $(docker compose ps -q ansible-toolbox) \
+  sh -lc "ansible-playbook playbooks/update_all.yml -i inventories/dev/hosts.ini"
+```
+
+### 5. Run specific updates
+```bash
+# Example: update n8n
+docker exec -it $(docker compose ps -q ansible-toolbox) \
+  sh -lc "ansible-playbook playbooks/update_n8n.yml -i inventories/dev/hosts.ini"
+```
 
 ---
 
-## 🪟 One‑click Windows automation (ready today)
+## Windows one‑click script
 
-Use **`AIstack.ps1`** to:  
-1) ensure Docker Desktop is running,  
-2) start the `ansible-toolbox` container,  
-3) execute your Ansible playbook,  
-4) log everything to `logs\update-YYYYMMDD-HHMMSS.log`,  
-5) prevent overlapping runs with a global mutex.
+**`AIstack.ps1`** runs the full update from Windows:
+- Starts Docker Desktop if needed.  
+- Brings up the `ansible-toolbox` container.  
+- Runs `update_all.yml`.  
+- Saves logs in `.\logs\update-YYYYMMDD-HHMMSS.log`.  
+- Prevents overlapping runs with a global mutex.  
 
-### Run it manually
+Run manually:
 ```powershell
 .\AIstack.ps1
 ```
 
-### Schedule it (Task Scheduler)
-- **Trigger:** At log on, or Daily at desired time.  
-- **Action:** PowerShell `-ExecutionPolicy Bypass -File "Z:\GitHub\ansible-in-docker\AIstack.ps1"`  
-- **Run whether user is logged on or not**, **Run with highest privileges** (if needed).  
-- Ensure your user is in the **docker-users** group.
-
-> Logs live in `.\logs\`. If Docker takes longer to start, the script waits up to ~3 minutes for the engine.
+Schedule with **Task Scheduler** if you want it to run automatically.  
 
 ---
 
-## ⚙️ Environment & customization
-Create a `.env` (or inventory/group_vars) for service parameters:
-```ini
-# Example
-ANSIBLE_USER=youruser
-ANSIBLE_PASSWORD=yourpassword
+## Configuration
 
-OLLAMA_MODEL=llama3.1
-POSTGRES_DB=ai_db
-POSTGRES_USER=ai_user
-POSTGRES_PASSWORD=supersecret
-```
-
-Update `inventories/dev/hosts.ini` with your target(s). Add roles under `roles/` for Postgres, Qdrant, Ollama, n8n, etc.
+- **Inventory (`inventories/dev/hosts.ini`)**: define your hosts and connection details.  
+- **ansible.cfg**: set defaults like inventory path and roles path.  
+- **requirements.yml**: declare external collections.  
+- **.vault/**: keep this empty in git; use Ansible Vault for secrets.  
 
 ---
 
-## 🔐 Security notes
-- Use a **dedicated non‑admin** Ansible user on targets.  
-- Store secrets in **Ansible Vault** or GitHub Actions Secrets (when you enable CI).  
-- Pin image tags and test updates in a staging inventory before prod.  
-- Prefer running steps inside containers for isolation.
+## Optional: GitHub Actions
 
----
-
-## 🤖 CI/CD (optional — not enabled yet)
-If you want to run this via a **self‑hosted GitHub Actions runner** on your lab machine, add the following workflow at `.github/workflows/deploy.yml`:
+You can add a workflow later to run these playbooks automatically.  
+Example workflow (disabled by default):
 
 ```yaml
 name: Deploy (self-hosted)
@@ -114,27 +136,34 @@ name: Deploy (self-hosted)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 6 * * *" # daily 06:00 UTC
+    - cron: "0 6 * * *"  # daily 06:00 UTC
 
 jobs:
   deploy:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
-      - name: Run Ansible playbook
+      - name: Run playbook
         run: |
           docker compose up -d
-          docker exec -i $(docker compose ps -q ansible-toolbox) sh -lc "ansible --version && ansible-playbook playbooks/update_all.yml -i inventories/dev/hosts.ini"
+          docker exec -i $(docker compose ps -q ansible-toolbox) \
+            sh -lc "ansible-playbook playbooks/update_all.yml -i inventories/dev/hosts.ini"
 ```
-
-> **Reminder:** This is just a template. It won’t run until you register a self‑hosted runner **and** commit this file.
 
 ---
 
-## 📷 Screenshots / demo
+## Security notes
+- Use a **non‑admin** Ansible user where possible.  
+- Store sensitive data in **Ansible Vault**.  
+- Pin Docker image tags to avoid surprises during updates.  
+- Test playbooks on non‑critical hosts first.  
+
+---
+
+##  Screenshots / demo
 See portfolio gallery: https://tjas01.github.io
 
 ---
 
-## 📜 License
+##  License
 MIT — fork and adapt freely.
